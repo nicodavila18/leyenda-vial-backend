@@ -1,0 +1,8 @@
+pyjwt
+passlib[bcrypt]
+fastapi
+uvicorn
+pydantic
+psycopg[binary]
+python-dotenv
+mercadopago

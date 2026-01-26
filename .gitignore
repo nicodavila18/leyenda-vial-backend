@@ -1,0 +1,47 @@
+# --- SEGURIDAD (CRÍTICO) ---
+.env
+.env.local
+*.key
+*.pem
+secrets.json
+
+# --- PYTHON (Backend) ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.pytest_cache/
+
+# --- FLUTTER / DART (Frontend) ---
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# --- ANDROID GENERATED ---
+android/.gradle
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/**/generated/
+android/**/gradle-wrapper.jar
+
+# --- IOS GENERATED ---
+ios/.generated/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Pods/
+ios/Podfile.lock
+
+# --- VS CODE & IDEs ---
+.vscode/
+.idea/
+*.iml
+*.DS_Store
+Thumbs.db
