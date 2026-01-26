@@ -1,7 +1,7 @@
 fastapi
 uvicorn
-pydantic[email]  <-- CAMBIA pydantic POR ESTO o agrega la línea de abajo
-email-validator  <-- AGREGA ESTA LÍNEA
+pydantic[email]
+email-validator
 psycopg[binary]
 python-dotenv
 passlib[bcrypt]
