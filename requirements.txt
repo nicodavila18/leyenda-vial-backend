@@ -1,8 +1,9 @@
-pyjwt
-passlib[bcrypt]
 fastapi
 uvicorn
-pydantic
+pydantic[email]  <-- CAMBIA pydantic POR ESTO o agrega la línea de abajo
+email-validator  <-- AGREGA ESTA LÍNEA
 psycopg[binary]
 python-dotenv
+passlib[bcrypt]
+pyjwt
 mercadopago
