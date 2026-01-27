@@ -7,8 +7,12 @@ from math import radians, cos, sin, asin, sqrt
 
 load_dotenv()
 
-# ZONA GRAN MENDOZA (Luján, Maipú, Capital, Las Heras, Godoy Cruz, Guaymallén)
-BBOX = "-33.05,-68.95,-32.75,-68.70"
+# --- CONFIGURACIÓN ESTRATÉGICA ---
+# Centro en MAIPÚ (Punto medio estratégico entre Ciudad y San Martín)
+LAT_CENTRO = -32.9750
+LON_CENTRO = -68.7830
+RADIO_METROS = 30000  # 30 KM de radio (Cubre Capital, Godoy Cruz, Luján, Maipú, San Martín, Junín)
+DISTANCIA_MINIMA = 300 # Metros de separación entre puntos para no saturar
 
 def get_db_connection():
     return psycopg.connect(
@@ -40,38 +44,37 @@ def borrar_todo_el_mapa():
     finally:
         conn.close()
 
-def importar_lugares(tipo_osm, tipo_nuestro):
-    print(f"🌍 Buscando '{tipo_osm}' en Mendoza (OSM)...")
+def importar_lugares(tipo_osm, valor_osm, tipo_nuestro):
+    print(f"🌍 Buscando '{valor_osm}' en un radio de {RADIO_METROS/1000}km...")
     
-    # 1. AUMENTAMOS EL TIMEOUT A 60 SEGUNDOS
+    # QUERY CIRCULAR (AROUND)
+    # Busca nodos (puntos) y ways (edificios) cerca de Maipú
     query = f"""
-    [out:json][timeout:60];
+    [out:json][timeout:90];
     (
-      node["amenity"="{tipo_osm}"]({BBOX});
-      way["amenity"="{tipo_osm}"]({BBOX}); 
+      node["{tipo_osm}"="{valor_osm}"](around:{RADIO_METROS},{LAT_CENTRO},{LON_CENTRO});
+      way["{tipo_osm}"="{valor_osm}"](around:{RADIO_METROS},{LAT_CENTRO},{LON_CENTRO}); 
     );
     out center;
     """
-    # Nota: Agregué 'way' y 'out center' para encontrar edificios grandes que no son solo puntos (nodos).
     
-    # URL alternativa (lz4) que suele ser más rápida
     url = "https://lz4.overpass-api.de/api/interpreter"
     
     datos = []
     exito = False
 
-    # 2. SISTEMA DE REINTENTOS (3 intentos)
+    # SISTEMA DE REINTENTOS ROBUSTO
     for intento in range(1, 4):
         try:
             headers = {'User-Agent': 'SeguridadVialApp/1.0'}
-            response = requests.get(url, params={'data': query}, headers=headers, timeout=65)
+            response = requests.get(url, params={'data': query}, headers=headers, timeout=100)
             
             if response.status_code == 200:
                 datos = response.json().get('elements', [])
                 exito = True
-                break # ¡Éxito! Salimos del bucle
+                break 
             elif response.status_code == 429:
-                print(f"   ⏳ Servidor ocupado (429). Esperando 5s... (Intento {intento}/3)")
+                print(f"   ⏳ Servidor saturado. Esperando 5s... (Intento {intento}/3)")
                 time.sleep(5)
             else:
                 print(f"   ⚠️ Error {response.status_code}. Reintentando... (Intento {intento}/3)")
@@ -82,10 +85,10 @@ def importar_lugares(tipo_osm, tipo_nuestro):
             time.sleep(2)
 
     if not exito:
-        print(f"❌ No se pudo descargar '{tipo_osm}' después de 3 intentos.")
+        print(f"❌ No se pudo descargar '{valor_osm}'. Saltando...")
         return
 
-    print(f"📡 Encontrados {len(datos)} candidatos.")
+    print(f"📡 Encontrados {len(datos)} candidatos brutos.")
 
     conn = get_db_connection()
     guardados = 0
@@ -93,26 +96,33 @@ def importar_lugares(tipo_osm, tipo_nuestro):
     
     try:
         with conn.cursor() as cur:
+            # Primero recuperamos lo que ya hay en la BD para no encimar con categorías anteriores
+            cur.execute("SELECT ST_Y(location::geometry) as lat, ST_X(location::geometry) as lon FROM fixed_points")
+            puntos_existentes = cur.fetchall()
+            # Convertimos tuplas (lat, lon) a lista de dicts para usar tu lógica
+            for p in puntos_existentes:
+                puntos_procesados.append({'lat': p[0], 'lon': p[1]})
+
             for item in datos:
-                # Si es un edificio (way), usamos su 'center', si es nodo usamos lat/lon
                 lat = item.get('lat') or item.get('center', {}).get('lat')
                 lon = item.get('lon') or item.get('center', {}).get('lon')
                 
                 if not lat or not lon: continue
 
-                nombre = item.get('tags', {}).get('name', 'Sin Nombre')
+                nombre = item.get('tags', {}).get('name', f"{tipo_nuestro.capitalize()} s/n")
                 
-                # FILTRO ANTI-CLONES (100 metros para asegurar)
+                # --- FILTRO INTELIGENTE DE 300 METROS ---
                 es_duplicado = False
                 for p in puntos_procesados:
                     dist = calcular_distancia(lat, lon, p['lat'], p['lon'])
-                    if dist < 100: 
+                    if dist < DISTANCIA_MINIMA: # <--- ACÁ ESTÁ EL CAMBIO A 300m
                         es_duplicado = True
                         break
                 
                 if es_duplicado:
                     continue 
 
+                # Limpieza de dirección
                 calle = item.get('tags', {}).get('addr:street', '')
                 altura = item.get('tags', {}).get('addr:housenumber', '')
                 direccion = f"{calle} {altura}".strip() or "Ubicación s/d"
@@ -126,23 +136,32 @@ def importar_lugares(tipo_osm, tipo_nuestro):
                 guardados += 1
             
             conn.commit()
-            print(f"✅ Guardados {guardados} {tipo_nuestro}.\n")
+            print(f"✅ Guardados {guardados} puntos de tipo {tipo_nuestro}.\n")
 
     except Exception as e:
-        print(f"❌ Error en BD: {e}")
+        print(f"❌ Error insertando en BD: {e}")
     finally:
         conn.close()
 
 # --- EJECUCIÓN PRINCIPAL ---
 if __name__ == "__main__":
+    print("🚀 INICIANDO CARGA MASIVA (Radio 30km desde Maipú)...")
     borrar_todo_el_mapa()
     
-    importar_lugares("hospital", "hospital")
+    # 1. HOSPITALES Y CLÍNICAS 🏥
+    importar_lugares("amenity", "hospital", "hospital")
+    importar_lugares("amenity", "clinic", "hospital")
     time.sleep(1)
     
-    importar_lugares("police", "comisaria")
+    # 2. COMISARÍAS 👮‍♂️
+    importar_lugares("amenity", "police", "comisaria")
     time.sleep(1)
     
-    importar_lugares("clinic", "hospital") 
+    # 3. TALLERES MECÁNICOS 🔧 (Agregado nuevo)
+    importar_lugares("shop", "car_repair", "taller")
+    time.sleep(1)
+
+    # 4. ESTACIONES DE SERVICIO ⛽ (Agregado nuevo - Útil para viajeros)
+    importar_lugares("amenity", "fuel", "taller") # Los ponemos como ícono taller o podés crear uno nuevo
     
-    print("🎉 ¡PROCESO TERMINADO CORRECTAMENTE!")
+    print("🎉 ¡MAPA ACTUALIZADO CON ÉXITO!")
