@@ -531,7 +531,7 @@ def crear_preferencia(solicitud: SolicitudPago):
                     "quantity": 1,
                     "unit_price": solicitud.precio,
                     "currency_id": "ARS", # Pesos Argentinos
-                    "external_reference": str(current_user.id),
+                    "external_reference": solicitud.user_id,
                 }
             ],
             # Datos del pagador (opcional pero recomendado)
@@ -781,29 +781,6 @@ def cancelar_suscripcion(req: CancelacionRequest):
     finally:
         conn.close()
 
-# --- SIMULACIÓN DE WEBHOOK (SOLO PARA DESARROLLO) ---
-@app.get("/webhook-simulado")
-def webhook_simulado(user_id: str):
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cur:
-            # Simulamos que MercadoPago nos dijo: "Pago Aprobado"
-            # Le damos 30 días de premium a partir de AHORA
-            
-            cur.execute("""
-                UPDATE users 
-                SET premium_expires_at = NOW() + INTERVAL '30 days',
-                    subscription_status = 'active',
-                    is_premium = TRUE 
-                WHERE id = %s
-            """, (user_id,))
-            
-            conn.commit()
-            return {"mensaje": f"✅ LISTO: El usuario {user_id} ahora es Premium por 30 días."}
-    except Exception as e:
-        return {"error": str(e)}
-    finally:
-        conn.close()
 
 @app.get("/prueba-vida-mp")
 def prueba_vida_mp():
