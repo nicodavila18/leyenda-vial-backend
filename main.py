@@ -1,6 +1,6 @@
 import jwt
 import os
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from pydantic import BaseModel, EmailStr
 import psycopg
 from psycopg.rows import dict_row
@@ -530,7 +530,8 @@ def crear_preferencia(solicitud: SolicitudPago):
                     "title": solicitud.titulo,
                     "quantity": 1,
                     "unit_price": solicitud.precio,
-                    "currency_id": "ARS" # Pesos Argentinos
+                    "currency_id": "ARS", # Pesos Argentinos
+                    "external_reference": str(current_user.id),
                 }
             ],
             # Datos del pagador (opcional pero recomendado)
@@ -838,3 +839,52 @@ def prueba_vida_mp():
     except Exception as e:
         print(f"❌ FALLÓ LA PRUEBA: {e}")
         return {"error": str(e)}
+
+# --- WEBHOOK DE MERCADOPAGO ---
+@app.post("/webhook")
+async def recibir_notificacion(request: Request):
+    # 1. Leer los datos que manda MercadoPago
+    params = request.query_params
+    topic = params.get("topic") or params.get("type")
+    id_pago = params.get("id") or params.get("data.id")
+
+    print(f"🔔 Notificación recibida: {topic} - ID: {id_pago}")
+
+    # 2. Solo nos importan los pagos, no otras notificaciones
+    if topic == "payment" and id_pago:
+        try:
+            # 3. PREGUNTAR a MP el estado real del pago (Seguridad 🛡️)
+            # No confiamos ciegamente en lo que llega, verificamos con el ID
+            payment_info = sdk.payment().get(id_pago)
+            payment = payment_info["response"]
+            
+            status = payment.get("status")
+            external_reference = payment.get("external_reference") # Acá guardamos el ID del usuario
+
+            print(f"💰 Estado del pago: {status} | Usuario: {external_reference}")
+
+            # 4. Si está APROBADO, damos el Premium
+            if status == "approved" and external_reference:
+                # Conectar a la base de datos
+                conn = get_db_connection()
+                cur = conn.cursor()
+                
+                # Actualizar usuario a Premium + Guardar ID de suscripción
+                cur.execute("""
+                    UPDATE users 
+                    SET is_premium = TRUE, 
+                        subscription_status = 'active',
+                        subscription_id = %s,
+                        premium_expires_at = NOW() + INTERVAL '30 days'
+                    WHERE id = %s
+                """, (str(id_pago), external_reference))
+                
+                conn.commit()
+                cur.close()
+                conn.close()
+                print("✅ ¡Usuario actualizado a PREMIUM!")
+
+        except Exception as e:
+            print(f"❌ Error procesando pago: {str(e)}")
+
+    return {"status": "ok"}
