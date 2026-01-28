@@ -11,7 +11,7 @@ load_dotenv()
 # Centro en MAIPÚ (Punto medio estratégico entre Ciudad y San Martín)
 LAT_CENTRO = -32.9750
 LON_CENTRO = -68.7830
-RADIO_METROS = 30000  # 30 KM de radio (Cubre Capital, Godoy Cruz, Luján, Maipú, San Martín, Junín)
+RADIO_METROS = 60000
 DISTANCIA_MINIMA = 300 # Metros de separación entre puntos para no saturar
 
 def get_db_connection():
