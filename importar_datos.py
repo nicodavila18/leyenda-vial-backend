@@ -145,7 +145,7 @@ def importar_lugares(tipo_osm, valor_osm, tipo_nuestro):
 
 # --- EJECUCIÓN PRINCIPAL ---
 if __name__ == "__main__":
-    print("🚀 INICIANDO CARGA MASIVA (Radio 30km desde Maipú)...")
+    print("🚀 INICIANDO CARGA LIMPIA (Solo Emergencias)...")
     borrar_todo_el_mapa()
     
     # 1. HOSPITALES Y CLÍNICAS 🏥
@@ -155,13 +155,9 @@ if __name__ == "__main__":
     
     # 2. COMISARÍAS 👮‍♂️
     importar_lugares("amenity", "police", "comisaria")
-    time.sleep(1)
     
-    # 3. TALLERES MECÁNICOS 🔧 (Agregado nuevo)
-    importar_lugares("shop", "car_repair", "taller")
-    time.sleep(1)
-
-    # 4. ESTACIONES DE SERVICIO ⛽ (Agregado nuevo - Útil para viajeros)
-    importar_lugares("amenity", "fuel", "taller") # Los ponemos como ícono taller o podés crear uno nuevo
+    # (Comenté o borré los talleres y fuel para limpiar el mapa)
+    # importar_lugares("shop", "car_repair", "taller")
+    # importar_lugares("amenity", "fuel", "taller")
     
-    print("🎉 ¡MAPA ACTUALIZADO CON ÉXITO!")
+    print("🎉 ¡MAPA LIMPIO Y ACTUALIZADO!")
