@@ -299,7 +299,7 @@ def crear_reporte(reporte: ReporteNuevo):
                 WHERE type_code = %s 
                   AND is_active = TRUE
                   AND created_at > NOW() - INTERVAL '{intervalo}' -- <--- MAGIA: Solo buscamos recientes
-                  AND ST_DWithin(location, ST_SetSRID(ST_MakePoint(%s, %s), 4326), 50) -- <--- RADIO ACHICADO A 50m
+                  AND ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography, 50)
                 LIMIT 1
             """, (reporte.type_code, reporte.longitud, reporte.latitud))
             
