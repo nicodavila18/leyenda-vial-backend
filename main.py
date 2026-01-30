@@ -186,8 +186,14 @@ def registrar_usuario(usuario: UsuarioRegistro):
 
             # 3. Guardamos CON PROVINCIA Y LOCALIDAD 🌍
             cur.execute("""
-                INSERT INTO users (username, email, password_hash, provincia, localidad)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO users (
+                        username, email, password_hash, provincia, localidad,
+                        is_premium, subscription_status, premium_expires_at
+                )
+                VALUES (
+                        %s, %s, %s, %s, %s,
+                        TRUE, 'promo_lanzamiento', NOW() + INTERVAL '1 year'
+                )
                 RETURNING id, username
             """, (usuario.username, usuario.email, clave_hash, usuario.provincia, usuario.localidad))
             
